@@ -66,6 +66,7 @@ class CreateDBRequest(BaseModel):
   
 @app.post("/create_db")
 async def create_db(request: CreateDBRequest):
+    global db_name
     db_name = request.db_name
     
     connection = mysql.connector.connect(host="localhost", user="root", password="admin")  
@@ -222,11 +223,15 @@ def infer_primary_key(df):
             return column
     return None
 
+logging.debug("DB Name - ", db_name)
+
+
 @app.post("/create_tables_with_relationships")
 async def create_tables_with_relationships():
     global temp_file_paths
+    global db_name
 
-    db_name = db_name_global
+    db_name = db_name
     engine = create_engine(f'mysql+mysqlconnector://root:admin@localhost/{db_name}')
     metadata = MetaData()
 
@@ -288,41 +293,3 @@ async def create_tables_with_relationships():
 
     return {"status": "Data processing completed", "details": messages}
 
-
-
-# @app.post("/create_table_upload_data")
-# async def create_table_upload_data():
-#     global temp_file_paths  # Reference the global variable containing temp file paths
-
-#     # Create an engine
-#     db_name = db_name_global # Replace with your actual database name
-#     engine = create_engine(f'mysql+mysqlconnector://root:admin@localhost/{db_name}')
-
-#     messages = []
-
-#     for temp_file_path in temp_file_paths:
-#         file_extension = os.path.splitext(temp_file_path)[-1].lower()
-
-#         # Load the DataFrame based on file extension
-#         if file_extension == ".csv":
-#             df = pd.read_csv(temp_file_path)
-#         elif file_extension == ".xlsx":
-#             df = pd.read_excel(temp_file_path)
-#         else:
-#             return {"error": f"Invalid file format in {temp_file_path}. Please upload a CSV or XLSX file."}
-
-#         # Auto-generate table name
-#         table_name = os.path.splitext(os.path.basename(temp_file_path))[0]
-
-#         # Check if the table exists
-#         inspector = inspect(engine)
-#         if not inspector.has_table(table_name):
-#             df.to_sql(table_name, con=engine, index=False)
-#             message = f"Table {table_name} created and data inserted successfully"
-#         else:
-#             df.to_sql(table_name, con=engine, if_exists='append', index=False)
-#             message = f"Data inserted successfully into existing table {table_name}"
-
-#         messages.append({"file": temp_file_path, "status": message})
-
-#     return {"status": "Data processing completed", "details": messages}
