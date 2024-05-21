@@ -71,8 +71,7 @@ next_click.forEach(function (next_click_form) {
                 uploadFilesAndGetInfo();
                 break;
             case 3:
-                // sanitizeData();
-                // No backend call needed for step 3 (File Stats)
+                // File Stats Step: File stats are already updated in uploadFilesAndGetInfo()
                 break;
             case 4:
                 sanitizeData();
@@ -85,6 +84,8 @@ next_click.forEach(function (next_click_form) {
         }
     });
 });
+
+
 
 var back_click = document.querySelectorAll(".back_button");
 back_click.forEach(function (back_click_form) {
@@ -110,13 +111,15 @@ submit_click.forEach(function (submit_click_form) {
 });
 
 function updateform() {
-    main_form.forEach(function (mainform_number) {
+    main_form.forEach(function (mainform_number, index) {
         mainform_number.classList.remove('active');
+        if (index === formnumber) {
+            mainform_number.classList.add('active');
+        }
     });
-    if (formnumber < main_form.length) {
-        main_form[formnumber].classList.add('active');
-    }
 }
+
+
 function progress_forward() {
     num.innerHTML = formnumber + 1;
     if (formnumber < step_list.length) {
@@ -197,6 +200,28 @@ function formatFileSize(bytes) {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 
+function updateFileStatistics(fileInfo) {
+    const fileDetailsContainer = document.getElementById('file_details_container');
+    fileDetailsContainer.innerHTML = ''; // Clear existing content
+
+    fileInfo.forEach(info => {
+        const fileDetails = document.createElement('div');
+        fileDetails.classList.add('file-details');
+
+        fileDetails.innerHTML = `
+            <p>File Name: <span>${info.filename}</span></p>
+            <p>File Size: <span>${info["file_size(MB)"].toFixed(2)} MB</span></p>
+            <p>Total Rows: <span>${info.total_rows}</span></p>
+            <p>Total Columns: <span>${info.total_columns}</span></p>
+            <br>
+        `;
+
+        fileDetailsContainer.appendChild(fileDetails);
+    });
+}
+
+
+
 async function createDatabase() {
     const newProjectName = newProjectInput.value.trim();
     const existingProjectName = existingProjectSelect.value;
@@ -242,14 +267,26 @@ async function uploadFilesAndGetInfo() {
         formData.append('files', file);
     }
 
-    const response = await fetch('http://127.0.0.1:8000/upload_file_info', {
-        method: 'POST',
-        body: formData
-    });
-    const data = await response.json();
-    alert("Files Uploaded Successfully");
-    console.log(data);
+    try {
+        const response = await fetch('http://127.0.0.1:8000/upload_file_info', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to upload files and get info.");
+        }
+
+        const data = await response.json();
+        console.log(data);
+        if (data.file_info) {
+            updateFileStatistics(data.file_info);
+        }
+    } catch (error) {
+        console.error("Failed to fetch:", error);
+    }
 }
+
 
 async function sanitizeData() {
     const response = await fetch('http://127.0.0.1:8000/upload_and_clean', {
