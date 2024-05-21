@@ -1,5 +1,3 @@
- 
-
 var next_click = document.querySelectorAll(".next_button");
 var main_form = document.querySelectorAll(".main");
 var step_list = document.querySelectorAll(".progress-bar li");
@@ -54,7 +52,6 @@ fileInput.addEventListener('change', () => {
     }
 });
 
-// Remaining JavaScript code ...
 next_click.forEach(function (next_click_form) {
     next_click_form.addEventListener('click', function () {
         if (!validateform()) {
@@ -74,6 +71,7 @@ next_click.forEach(function (next_click_form) {
                 uploadFilesAndGetInfo();
                 break;
             case 3:
+                // sanitizeData();
                 // No backend call needed for step 3 (File Stats)
                 break;
             case 4:
@@ -91,10 +89,12 @@ next_click.forEach(function (next_click_form) {
 var back_click = document.querySelectorAll(".back_button");
 back_click.forEach(function (back_click_form) {
     back_click_form.addEventListener('click', function () {
-        formnumber--;
-        updateform();
-        progress_backward();
-        contentchange();
+        if (formnumber > 0) {
+            formnumber--;
+            updateform();
+            progress_backward();
+            contentchange();
+        }
     });
 });
 
@@ -113,15 +113,21 @@ function updateform() {
     main_form.forEach(function (mainform_number) {
         mainform_number.classList.remove('active');
     });
-    main_form[formnumber].classList.add('active');
+    if (formnumber < main_form.length) {
+        main_form[formnumber].classList.add('active');
+    }
 }
 function progress_forward() {
     num.innerHTML = formnumber + 1;
-    step_list[formnumber].classList.add('active');
+    if (formnumber < step_list.length) {
+        step_list[formnumber].classList.add('active');
+    }
 }
 function progress_backward() {
     var form_num = formnumber + 1;
-    step_list[form_num].classList.remove('active');
+    if (form_num < step_list.length) {
+        step_list[form_num].classList.remove('active');
+    }
     num.innerHTML = form_num;
     if (form_num === 5) {
         num.innerHTML = "Summary";
@@ -133,10 +139,12 @@ function contentchange() {
         content.classList.remove('active');
         content.classList.add('d-none');
     });
-    step_num_content[formnumber].classList.add('active');
+    if (formnumber < step_num_content.length) {
+        step_num_content[formnumber].classList.add('active');
+    }
 }
 function validateform() {
-    validate = true;
+    let validate = true;
     var validate_inputs = document.querySelectorAll(".main.active input[required], .main.active select[required]");
     validate_inputs.forEach(function (validate_input) {
         validate_input.classList.remove('warning');
@@ -239,6 +247,7 @@ async function uploadFilesAndGetInfo() {
         body: formData
     });
     const data = await response.json();
+    alert("Files Uploaded Successfully");
     console.log(data);
 }
 
@@ -251,9 +260,20 @@ async function sanitizeData() {
 }
 
 async function createTablesAndInsertData() {
-    const response = await fetch('http://127.0.0.1:8000/create_tables_with_relationships', {
-        method: 'POST'
-    });
-    const data = await response.json();
-    console.log(data);
- }
+    try {
+        const response = await fetch('http://127.0.0.1:8000/create_tables_with_relationships', {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to create tables with relationships');
+        }
+        const data = await response.json();
+        console.log(data);
+        // Add any UI update or success message here
+        alert("Data has been successfully loaded into the Database!");
+    } catch (error) {
+        console.error('Error:', error);
+        // Handle errors here
+        alert("An error occurred while creating tables with relationships.");
+    }
+}
