@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +7,28 @@
     <meta name="description" content="">
     <meta name="author" content="">
     <title>Dashboard</title>
+    <style>/* Add this to your main CSS file */
+
+.loader {
+            border: 16px solid #f3f3f3; /* Light grey */
+            border-top: 16px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            animation: spin 2s linear infinite;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: none; /* Initially hidden */
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        </style>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
@@ -186,8 +207,9 @@
                                                     </div>
                                                 </div>
                                                 <div class="button-container">
-                                                    <button class="next_button" disabled>Next Step</button>
+                                                    <button id="nextStepButton" class="next_button" >Next Step</button>
                                                 </div>
+                                                
                                             </div>
                                             <div class="main">
                                                 <div class="content">
@@ -207,46 +229,46 @@
                                                     <p id="fileList"></p>
                                                 </div>
                                                 <div class="button-container">
-                                                    <button class="back_button"> Back </button>
-                                                    <button class="next_button" disabled> Next Step </button>
+                                                    <button class="back_button">Back</button>
+                                                    <button class="next_button" disabled>Next Step</button>
                                                 </div>
                                             </div>
                                             <div class="main">
                                                 <div class="content">
                                                     <div class="text">
+                                                        <div id="loader" class="loader" style="display: none;"></div>
                                                         <h2>File Stats</h2>
+                                                        
+
                                                         <p>View the statistics of your uploaded files.</p>
                                                         <br>
                                                         <div id="file_details_container"></div>
                                                     </div>
                                                 </div>
                                                 <div class="button-container">
-                                                    <button class="back_button"> Back </button>
-                                                    <button class="next_button"> Next Step </button>
+                                                    <button class="back_button">Back</button>
+                                                    <button class="next_button">Next Step</button>
                                                 </div>
                                             </div>
-                                            
-                                            
                                             <div class="main">
                                                 <div class="content">
                                                     <div class="text">
-                                                       
-
                                                         <h2>Data Sanitisation</h2>
                                                         <p>Sanitize your data by fixing missing, corrupted, and null values.</p>
+                                                        <div id="loader" class="loader" style="display: none;"></div>
+
                                                         <div id="sanitizationResults"></div>
                                                     </div>
                                                     <br>
-                                                    <!-- Add this button after the file upload step in your HTML -->
-<button id="autoFixButton" class="btn btn-primary">Auto Fix</button>
-
+                                                    <button id="autoFixButton" class="san_button">Auto Fix</button>
+                                                    <div id="results"></div>
+                                                     <div id="loader" class="loader"></div>
                                                 </div>
                                                 <div class="button-container">
                                                     <button class="back_button">Back</button>
-                                                    <button class="next_button">Next</button>
+                                                    <button class="next_button" disabled>Next Step</button>
                                                 </div>
                                             </div>
-                        
                                             <div class="main">
                                                 <div class="content">
                                                     <div class="text">
@@ -254,10 +276,10 @@
                                                         <br>
                                                         <p>Your uploading summarized.</p>
                                                         <br>
-                                                        <div>Great, you have successfully uploaded your files </div>
+                                                        <div>Great, you have successfully uploaded your files</div>
                                                         <div class="congrats">Files Uploaded <i class="fa-solid fa-check"></i></div>
                                                         <div class="congrats">Checks Done <i class="fa-solid fa-check"></i></div>
-                                                        <div class="congrats">Data Sanatized <i class="fa-solid fa-check"></i></div>
+                                                        <div class="congrats">Data Sanitized <i class="fa-solid fa-check"></i></div>
                                                     </div>
                                                 </div>
                                                 <div class="button-container">
@@ -265,11 +287,11 @@
                                                     <button class="next_button">Update</button>
                                                 </div>
                                             </div>
-                                            
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                            
 
                         </div>
                         <!-- new code -->
