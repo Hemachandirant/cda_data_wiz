@@ -119,7 +119,7 @@ async def upload_file_info(files: List[UploadFile] = File(...)):
 @app.post("/upload_and_clean")
 async def upload_and_clean():
     global uploaded_files_info
-    global temp_file_paths
+    global temp_file_paths  # Reference the global variable
     sanitization_infos = []
 
     for file_info in uploaded_files_info:
@@ -190,9 +190,6 @@ async def upload_and_clean():
         logging.debug("-----------------------------------------------")
         logging.debug(temp_file_paths)
         sanitization_infos.append(sanitization_info)
-
-    # Clear uploaded_files_info after processing
-    uploaded_files_info.clear()
 
     return sanitization_infos
 
