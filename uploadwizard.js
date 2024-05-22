@@ -4,11 +4,16 @@ document.addEventListener("DOMContentLoaded", function () {
     var step_list = document.querySelectorAll(".progress-bar li");
     var num = document.querySelector(".step-number");
     let formnumber = 0;
+    const nextStepButton = document.getElementById("nextStepButton");
+    const loader = document.getElementById('loader');
+
+
 
     const newProjectInput = document.getElementById('newProjectInput');
     const existingProjectSelect = document.getElementById('existingProjectSelect');
     const fileInput = document.getElementById('file-upload');
     const fileList = document.getElementById('fileList');
+    const autoFixButton = document.getElementById("autoFixButton");
 
     // Disable/Enable inputs based on user selection
     newProjectInput.addEventListener('input', () => {
@@ -17,11 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
             next_click[formnumber].disabled = false;
         } else {
             existingProjectSelect.disabled = false;
-            if (existingProjectSelect.value === '') {
-                next_click[formnumber].disabled = true;
-            } else {
-                next_click[formnumber].disabled = false;
-            }
+            next_click[formnumber].disabled = existingProjectSelect.value === '';
         }
     });
 
@@ -31,11 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
             next_click[formnumber].disabled = false;
         } else {
             newProjectInput.disabled = false;
-            if (newProjectInput.value.trim() === '') {
-                next_click[formnumber].disabled = true;
-            } else {
-                next_click[formnumber].disabled = false;
-            }
+            next_click[formnumber].disabled = newProjectInput.value.trim() === '';
         }
     });
 
@@ -84,9 +81,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     break;
             }
         });
-    });
-    document.getElementById("autoFixButton").addEventListener("click", function () {
-        sanitizeData();
     });
 
     var back_click = document.querySelectorAll(".back_button");
@@ -155,7 +149,6 @@ document.addEventListener("DOMContentLoaded", function () {
         var validate_inputs = document.querySelectorAll(".main.active input[required], .main.active select[required]");
         validate_inputs.forEach(function (validate_input) {
             validate_input.classList.remove('warning');
-            // Check if both input fields are empty
             if (validate_inputs.length === 2 && validate_input.value.length === 0 && validate_inputs[0].value.length === 0 && validate_inputs[1].value.length === 0) {
                 validate = false;
                 validate_input.classList.add('warning');
@@ -201,9 +194,10 @@ document.addEventListener("DOMContentLoaded", function () {
             size /= 1024;
             unitIndex++;
         }
-
         return `${size.toFixed(2)} ${units[unitIndex]}`;
     }
+
+    
 
     function updateFileStatistics(fileInfo) {
         const fileDetailsContainer = document.getElementById('file_details_container');
@@ -261,8 +255,9 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Failed to fetch:", error);
         }
     }
-
     async function uploadFilesAndGetInfo() {
+        loader.style.display = 'block';  // Show the loader
+
         const formData = new FormData();
         for (const file of fileInput.files) {
             formData.append('files', file);
@@ -285,27 +280,72 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         } catch (error) {
             console.error("Failed to fetch:", error);
+        } finally {
+            loader.style.display = 'none';  // Hide the loader
         }
     }
 
+    function showLoader() {
+        loader.style.display = 'block';
+    }
+
+    // Function to hide loader
+    function hideLoader() {
+        loader.style.display = 'none';
+    }
     async function sanitizeData() {
+        showLoader();  // Show the loader
+
         try {
             const response = await fetch('http://127.0.0.1:8000/upload_and_clean', {
                 method: 'POST'
             });
-    
+
             if (!response.ok) {
                 throw new Error('Failed to sanitize data.');
             }
-    
+
             const data = await response.json();
             console.log(data);
-    
-            displaySanitizationResults(data);
+
+            displaySanitizationResults(data.sanitization_infos);
         } catch (error) {
             console.error("Failed to fetch:", error);
+        } finally {
+            hideLoader();  // Hide the loader
         }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Your code here
+        async function sanitizeData() {
+            const myButton = document.getElementById('myButton');
+            if (myButton) {
+                myButton.style.display = 'none';
+    
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/upload_and_clean', {
+                        method: 'POST'
+                    });
+    
+                    if (!response.ok) {
+                        throw new Error('Failed to sanitize data.');
+                    }
+    
+                    const data = await response.json();
+                    console.log(data);
+    
+                    displaySanitizationResults(data);
+                } catch (error) {
+                    console.error("Failed to fetch:", error);
+                }
+            } else {
+                console.error("Element with id 'myButton' not found.");
+            }
+        }
+    
+        sanitizeData(); // Call your function here or wherever it's needed
+    });
     
     function displaySanitizationResults(data) {
         const resultContainer = document.getElementById('sanitizationResults');
@@ -352,8 +392,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Event listener for Auto Fix button
-    document.getElementById("autoFixButton").addEventListener("click", function () {
+    autoFixButton.addEventListener("click", function () {
         sanitizeData();
+        autoFixButton.style.display = "none"; // Hide the "Auto Fix" button
+        nextStepButton.disabled = false; // Enable the "Next Step" button
     });
 
 });
