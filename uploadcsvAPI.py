@@ -1,52 +1,30 @@
-from fastapi import FastAPI, UploadFile, File    
-import csv    
-import mysql.connector    
-import io    
-import pandas as pd    
+from fastapi import FastAPI, UploadFile, File
+import csv
+import mysql.connector
+import io
+import pandas as pd
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-import os   
-import json  
+import os
 import tempfile
 from tempfile import NamedTemporaryFile
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sqlalchemy import create_engine, inspect, Table, Column, MetaData, Integer, ForeignKey, String
+from sqlalchemy import create_engine, Table, Column, MetaData, ForeignKey
 from sqlalchemy.dialects.mysql import VARCHAR
+import chardet
+import numpy as np
+from pydantic import BaseModel
+
 # Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
-import chardet
-  
 
-import numpy as np  
-  
-import numpy as np
-from sqlalchemy import create_engine 
-from sqlalchemy import create_engine, inspect
-from pydantic import BaseModel  
-  
 # Global variable to store the db_name 
-db_name = None 
-db_name_global = None  
+db_name_global = None
 # Global variable to store file info
 uploaded_files_info = []
-temp_file_path=[]
-temp_file_paths = []  # Initialize the list  
-sanitization_infos = [] 
+temp_file_paths = []
 
-
-
-
-
-engine = create_engine("mysql+mysqlconnector://root:admin@localhost/cda") 
-# Function to convert date format    
-def convert_date(date_str):    
-    try:    
-        return pd.to_datetime(date_str, format='%d/%m/%Y %H:%M').strftime('%Y-%m-%d %H:%M:%S')    
-    except ValueError:    
-        return None    
-  
-app = FastAPI()    
+app = FastAPI()
 
 # Allow CORS for your frontend origin
 origins = [
@@ -63,11 +41,11 @@ app.add_middleware(
 
 class CreateDBRequest(BaseModel):
     db_name: str
-  
+
 @app.post("/create_db")
 async def create_db(request: CreateDBRequest):
-    global db_name
-    db_name = request.db_name
+    global db_name_global
+    db_name_global = request.db_name
     
     connection = mysql.connector.connect(host="localhost", user="root", password="admin")  
     cursor = connection.cursor()  
@@ -75,21 +53,25 @@ async def create_db(request: CreateDBRequest):
     cursor.execute("SHOW DATABASES")  
     databases = cursor.fetchall()  
     
-    if (db_name,) in databases:  
-        return {"status": f"Database {db_name} already exists. Using existing database."}  
+    if (db_name_global,) in databases:  
+        cursor.close()
+        connection.close()
+        return {"status": f"Database {db_name_global} already exists. Using existing database."}  
     else:  
         try:
-            cursor.execute(f"CREATE DATABASE {db_name}")  
-            return {"status": f"Database {db_name} created successfully."}  
+            cursor.execute(f"CREATE DATABASE {db_name_global}")  
+            cursor.close()
+            connection.close()
+            return {"status": f"Database {db_name_global} created successfully."}  
         except mysql.connector.Error as err:
+            cursor.close()
+            connection.close()
             return {"error": f"Error creating database: {err}"}
- 
-    
 
 @app.post("/upload_file_info")
 async def upload_file_info(files: List[UploadFile] = File(...)):
-    global uploaded_files_info  # Reference the global variable
-    uploaded_files_info = []  # Reset the global variable
+    global uploaded_files_info
+    uploaded_files_info = []
 
     file_infos = []  # Create a list to store file info for all files
 
@@ -134,14 +116,10 @@ async def upload_file_info(files: List[UploadFile] = File(...)):
 
     return {"file_info": file_infos, "saved_files": uploaded_files_info}
 
-
-
-  
-
 @app.post("/upload_and_clean")
 async def upload_and_clean():
     global uploaded_files_info
-    global temp_file_paths  # Reference the global variable
+    global temp_file_paths
     sanitization_infos = []
 
     for file_info in uploaded_files_info:
@@ -213,9 +191,10 @@ async def upload_and_clean():
         logging.debug(temp_file_paths)
         sanitization_infos.append(sanitization_info)
 
+    # Clear uploaded_files_info after processing
+    uploaded_files_info.clear()
+
     return sanitization_infos
-
-
 
 def infer_primary_key(df):
     for column in df.columns:
@@ -223,16 +202,12 @@ def infer_primary_key(df):
             return column
     return None
 
-logging.debug("DB Name - ", db_name)
-
-
 @app.post("/create_tables_with_relationships")
 async def create_tables_with_relationships():
     global temp_file_paths
-    global db_name
+    global db_name_global
 
-    db_name = db_name
-    engine = create_engine(f'mysql+mysqlconnector://root:admin@localhost/{db_name}')
+    engine = create_engine(f'mysql+mysqlconnector://root:admin@localhost/{db_name_global}')
     metadata = MetaData()
 
     messages = []
@@ -249,7 +224,9 @@ async def create_tables_with_relationships():
         else:
             return {"error": f"Invalid file format in {temp_file_path}. Please upload a CSV or XLSX file."}
 
+        # Use a meaningful table name
         table_name = os.path.splitext(os.path.basename(temp_file_path))[0]
+        table_name = table_name.lower().replace(' ', '_')
 
         primary_key_column = infer_primary_key(df)
         if not primary_key_column:
@@ -272,8 +249,7 @@ async def create_tables_with_relationships():
                     foreign_key = ForeignKey(f"{ref_table_name}.{column.name}")
                     relationships.append((table, column.name, foreign_key))
 
-    for table in table_definitions.values():
-        table.create(engine, checkfirst=True)
+    metadata.create_all(engine)  # Create all tables at once
 
     for table, column_name, foreign_key in relationships:
         with engine.connect() as conn:
@@ -282,6 +258,7 @@ async def create_tables_with_relationships():
     for temp_file_path in temp_file_paths:
         file_extension = os.path.splitext(temp_file_path)[-1].lower()
         table_name = os.path.splitext(os.path.basename(temp_file_path))[0]
+        table_name = table_name.lower().replace(' ', '_')
 
         if file_extension == ".csv":
             df = pd.read_csv(temp_file_path)
@@ -291,5 +268,11 @@ async def create_tables_with_relationships():
         df.to_sql(table_name, con=engine, if_exists='append', index=False)
         messages.append({"file": temp_file_path, "status": f"Data inserted into table {table_name}"})
 
-    return {"status": "Data processing completed", "details": messages}
+        # Delete the temporary file
+        os.remove(temp_file_path)
+        messages.append({"file": temp_file_path, "status": "Temporary file deleted"})
 
+    # Clear the temp_file_paths list after processing
+    temp_file_paths.clear()
+
+    return {"status": "Data processing completed", "details": messages}
