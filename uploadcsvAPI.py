@@ -23,7 +23,7 @@ db_name_global = None
 # Global variable to store file info
 uploaded_files_info = []
 temp_file_paths = []
-
+file_names = []
 app = FastAPI()
 
 # Allow CORS for your frontend origin
@@ -71,13 +71,16 @@ async def create_db(request: CreateDBRequest):
 @app.post("/upload_file_info")
 async def upload_file_info(files: List[UploadFile] = File(...)):
     global uploaded_files_info
-    uploaded_files_info = []
+    global file_names  # Ensure this is global
 
+    uploaded_files_info = []
     file_infos = []  # Create a list to store file info for all files
+    file_names = []  # Create a list to store file names
 
     for file in files:
         file_extension = os.path.splitext(file.filename)[-1].lower()
         file_content = await file.read()  # Read file content
+        file_names.append(file.filename.split('.')[0])  # Store file name without extension
 
         # Detect file encoding
         result = chardet.detect(file_content)
@@ -114,7 +117,10 @@ async def upload_file_info(files: List[UploadFile] = File(...)):
         file_infos.append(file_info)
         logging.debug(uploaded_files_info)
 
-    return {"file_info": file_infos, "saved_files": uploaded_files_info}
+    return {"file_info": file_infos, "saved_files": uploaded_files_info, "file_names": file_names}
+
+
+
 
 @app.post("/upload_and_clean")
 async def upload_and_clean():
@@ -191,7 +197,10 @@ async def upload_and_clean():
         logging.debug(temp_file_paths)
         sanitization_infos.append(sanitization_info)
 
-    return sanitization_infos
+    # Clear uploaded_files_info after processing
+    uploaded_files_info.clear()
+
+    return {"status": "Data cleaned and saved", "sanitization_infos": sanitization_infos}
 
 def infer_primary_key(df):
     for column in df.columns:
@@ -203,6 +212,13 @@ def infer_primary_key(df):
 async def create_tables_with_relationships():
     global temp_file_paths
     global db_name_global
+    global file_names  # Ensure this is global
+
+    if file_names is None:
+        return {"error": "file_names is not initialized."}
+
+    if len(temp_file_paths) != len(file_names):
+        return {"error": "Mismatch between number of temporary files and file names."}
 
     engine = create_engine(f'mysql+mysqlconnector://root:admin@localhost/{db_name_global}')
     metadata = MetaData()
@@ -211,7 +227,7 @@ async def create_tables_with_relationships():
     table_definitions = {}
     relationships = []
 
-    for temp_file_path in temp_file_paths:
+    for temp_file_path, file_name in zip(temp_file_paths, file_names):  # Use zip to iterate through both lists
         file_extension = os.path.splitext(temp_file_path)[-1].lower()
 
         if file_extension == ".csv":
@@ -221,13 +237,12 @@ async def create_tables_with_relationships():
         else:
             return {"error": f"Invalid file format in {temp_file_path}. Please upload a CSV or XLSX file."}
 
-        # Use a meaningful table name
-        table_name = os.path.splitext(os.path.basename(temp_file_path))[0]
-        table_name = table_name.lower().replace(' ', '_')
+        # Use file_name directly as table name
+        table_name = file_name.lower().replace(' ', '_')
 
         primary_key_column = infer_primary_key(df)
         if not primary_key_column:
-            messages.append({"file": temp_file_path, "status": "No unique column found for primary key"})
+            messages.append({"file": temp_file_path, "status": f"No unique column found for primary key in {file_name}"})
             continue
 
         columns = [Column(col, VARCHAR(255)) for col in df.columns]
@@ -252,10 +267,9 @@ async def create_tables_with_relationships():
         with engine.connect() as conn:
             conn.execute(f"ALTER TABLE {table.name} ADD CONSTRAINT fk_{table.name}_{column_name} FOREIGN KEY ({column_name}) REFERENCES {foreign_key.target_fullname}")
 
-    for temp_file_path in temp_file_paths:
+    for temp_file_path, file_name in zip(temp_file_paths, file_names):  # Use zip to iterate through both lists
         file_extension = os.path.splitext(temp_file_path)[-1].lower()
-        table_name = os.path.splitext(os.path.basename(temp_file_path))[0]
-        table_name = table_name.lower().replace(' ', '_')
+        table_name = file_name.lower().replace(' ', '_')
 
         if file_extension == ".csv":
             df = pd.read_csv(temp_file_path)
@@ -269,7 +283,9 @@ async def create_tables_with_relationships():
         os.remove(temp_file_path)
         messages.append({"file": temp_file_path, "status": "Temporary file deleted"})
 
-    # Clear the temp_file_paths list after processing
+    # Clear the temp_file_paths and file_names lists after processing
     temp_file_paths.clear()
+    file_names.clear()
 
     return {"status": "Data processing completed", "details": messages}
+
