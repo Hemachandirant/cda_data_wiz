@@ -1,0 +1,68 @@
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from pandasai.llm.local_llm import LocalLLM
+from pandasai.connectors import MySQLConnector
+from pandasai import SmartDataframe
+from pandasai.helpers.cache import Cache
+import uvicorn
+
+# MySQL connection configuration
+my_connector = MySQLConnector(
+    config={
+        "host": "localhost",
+        "port": 3306,
+        "database": "customer_behaviour",
+        "username": "root",
+        "password": "admin",
+        "table": "book",
+    }
+)
+
+# Initialize the LocalLLM model
+model = LocalLLM(
+    api_base="http://localhost:11434/v1",
+    model="llama3"
+)
+
+# Define a cache class with no persistence or disable it
+class NoCache(Cache):
+    def __init__(self):
+        self.connection = None
+
+    def execute(self, query):
+        pass
+
+    def fetchall(self):
+        return []
+
+cache = NoCache()
+
+# Initialize the SmartDataframe with MySQL connector, LLM model, and cache
+df_connector = SmartDataframe(my_connector, config={"llm": model, "cache": cache})
+
+# Initialize FastAPI app
+app = FastAPI()
+
+# Pydantic model for request body
+class PromptRequest(BaseModel):
+    prompt: str
+
+@app.post("/generate")
+async def generate_response(request: PromptRequest):
+    try:
+        # Ensure StringIO is imported before executing any code
+        exec('from io import StringIO', globals())
+        response = df_connector.chat(request.prompt)
+        return JSONResponse(content={"response": response})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+
+# Root endpoint
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the MySQL with Llama-3 API"}
+
+# Run the app with Uvicorn
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
